@@ -28,3 +28,7 @@ spring:
 
   mybatis:
     mapper-locations: classpath:mapper/*.xml
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
