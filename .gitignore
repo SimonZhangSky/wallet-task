@@ -1,0 +1,17 @@
+# IntelliJ IDEA
+.idea/
+
+# Compiled class file
+*.class
+
+# Log files
+*.log
+
+# Bytecode directories
+target/
+out/
+
+# Maven
+log/
+target/
+release-notes*
