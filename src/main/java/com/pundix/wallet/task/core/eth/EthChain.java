@@ -1,5 +1,7 @@
-package com.pundix.wallet.task.core;
+package com.pundix.wallet.task.core.eth;
 
+import org.apache.commons.lang3.tuple.Triple;
+import org.springframework.stereotype.Component;
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Keys;
 import org.web3j.protocol.Web3j;
@@ -17,44 +19,44 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+/**
+ * 以太坊链操作
+ */
+@Component
 public class EthChain {
 
-    private Web3j web3j;
+    private final Web3j web3j;
 
-    private Admin admin;
+    private final Admin admin;
 
-    private final String ETH_RPC_URL = "https://eth-mainnet.g.alchemy.com/v2/LANUTqbMxdeg_BuV3DoIpNPO3VuSmz8x";
-    private final String ETH_WALLET_ADDRESS = "0x7A85147CB61E0C26F50F74DF664fb04F0824701c";
-    private final String ETH_USDT_CONTRACT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+    public EthChain(Web3j web3j, Admin admin) {
+        this.web3j = web3j;
+        this.admin = admin;
+    }
 
     // 默认 Gas 价格
-    private static final BigDecimal defaultGasPrice = BigDecimal.valueOf(5);
-
+    public final BigDecimal defaultGasPrice = BigDecimal.valueOf(5);
 
     /**
-     * 获取余额
+     * 生成地址
      *
-     * @return 余额
+     * @return 钱包地址、私钥、公钥
      */
-    public String generateAddress() {
+    public Triple<String, BigInteger, BigInteger> generateAddress() {
         // 生成新的密钥对
-        ECKeyPair ecKeyPair = null;
+        ECKeyPair ecKeyPair;
         try {
             ecKeyPair = Keys.createEcKeyPair();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("生成TH地址失败", e);
         }
-
         // 获取私钥和公钥
         BigInteger privateKey = ecKeyPair.getPrivateKey();
         BigInteger publicKey = ecKeyPair.getPublicKey();
-
         // 获取钱包地址
         String address = Keys.getAddress(publicKey);
 
-        // TODO 保存用户的公钥、私钥和地址
-
-        return address;
+        return Triple.of(address, privateKey, publicKey);
     }
 
     /**
@@ -64,12 +66,12 @@ public class EthChain {
      * @return 余额
      */
     public BigInteger getBalanceByAddress(String address) {
-        BigInteger balance = null;
+        BigInteger balance;
         try {
-            EthGetBalance ethGetBalance = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send();
+            EthGetBalance ethGetBalance = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).sendAsync().get();
             balance = ethGetBalance.getBalance();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            throw new RuntimeException("获取ETH地址余额失败", e);
         }
         System.out.println("address " + address + " balance " + balance + "wei");
         return balance;
