@@ -9,4 +9,6 @@ public interface UserWalletRepository extends JpaRepository<UserWallet, Integer>
 
     List<UserWallet> findByUserId(int userId);
 
+    UserWallet findByUserIdAndAddress(int userId, String address);
+
 }

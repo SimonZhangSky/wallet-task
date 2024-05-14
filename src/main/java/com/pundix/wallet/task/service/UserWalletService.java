@@ -69,7 +69,7 @@ public class UserWalletService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        Triple<String, BigInteger, BigInteger> triple = ethChain.generateAddress();
+        Triple<String, String, String> triple = ethChain.generateAddress();
 
         log.info("Create wallet for user: {}, address: {}, privateKey: {}, publicKey: {}", user.getId(), triple.getLeft(), triple.getMiddle(), triple.getRight());
 
@@ -89,17 +89,17 @@ public class UserWalletService {
         );
     }
 
-    private UserWallet getUserWallet(Triple<String, BigInteger, BigInteger> triple, User user) {
+    private UserWallet getUserWallet(Triple<String, String, String> triple, User user) {
         String address = triple.getLeft();
-        BigInteger privateKey = triple.getMiddle();
-        BigInteger publicKey = triple.getRight();
+        String privateKey = triple.getMiddle();
+        String publicKey = triple.getRight();
 
         UserWallet userWallet = new UserWallet();
         userWallet.setUserId(user.getId());
         userWallet.setWalletType(WalletTpyeEnum.ETH);
         userWallet.setAddress(address);
-        userWallet.setPrivateKey(privateKey.toString());
-        userWallet.setPublicKey(publicKey.toString());
+        userWallet.setPrivateKey(privateKey);
+        userWallet.setPublicKey(publicKey);
         userWallet.setStatus(WalletStatusEnum.NORMAL);
         userWallet.setDefault(false);
         userWallet.setCreateTime(new Date());

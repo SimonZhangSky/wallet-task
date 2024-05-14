@@ -1,5 +1,6 @@
 package com.pundix.wallet.task.controller;
 
+import com.github.pagehelper.PageInfo;
 import com.pundix.wallet.task.dto.UserTradingSendETHRequest;
 import com.pundix.wallet.task.dto.UserTradingSendTokenRequest;
 import com.pundix.wallet.task.dto.UserTransactionListRequest;
@@ -7,6 +8,7 @@ import com.pundix.wallet.task.service.UserTradingService;
 import com.pundix.wallet.task.utils.ApiResponse;
 import io.swagger.annotations.*;
 import org.springframework.web.bind.annotation.*;
+import org.web3j.protocol.core.methods.response.Transaction;
 
 @RestController
 @RequestMapping("/userTrading")
@@ -46,11 +48,15 @@ public class UserTradingController {
     }
 
     @PostMapping("/{userId}/transaction/list")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "userId", value = "用户ID", required = true, dataType = "Integer", paramType = "path"),
+            @ApiImplicitParam(name = "transactionListRequest", value = "用户查询交易请求", required = true, dataType = "UserTransactionListRequest", paramType = "body")
+    })
     public ApiResponse transactionList(@PathVariable Integer userId, @RequestBody UserTransactionListRequest transactionListRequest) {
 
-        // TODO 交易记录查询
+        PageInfo<Transaction> transactionPageInfo = userTradingService.transactionList(userId, transactionListRequest);
 
-        return ApiResponse.success("查询成功", null);
+        return ApiResponse.success("查询成功", transactionPageInfo);
     }
 
 }

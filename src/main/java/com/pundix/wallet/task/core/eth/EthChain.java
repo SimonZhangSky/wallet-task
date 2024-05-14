@@ -1,5 +1,9 @@
 package com.pundix.wallet.task.core.eth;
 
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.pundix.wallet.task.dto.UserTransactionListRequest;
 import com.pundix.wallet.task.entity.UserWallet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Triple;
@@ -12,8 +16,8 @@ import org.web3j.crypto.Credentials;
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Keys;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
-import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
@@ -21,6 +25,7 @@ import org.web3j.utils.Convert;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,7 +46,7 @@ public class EthChain {
      *
      * @return 钱包地址、私钥、公钥
      */
-    public Triple<String, BigInteger, BigInteger> generateAddress() {
+    public Triple<String, String, String> generateAddress() {
         // 生成新的密钥对
         ECKeyPair ecKeyPair;
         try {
@@ -52,8 +57,9 @@ public class EthChain {
         Credentials credentials = Credentials.create(ecKeyPair);
 
         // 获取私钥和公钥
-        BigInteger privateKey = credentials.getEcKeyPair().getPrivateKey();
-        BigInteger publicKey = credentials.getEcKeyPair().getPublicKey();
+        String privateKey = String.format("%064x", ecKeyPair.getPrivateKey());
+        String publicKey = String.format("%0128x", ecKeyPair.getPublicKey());
+
         // 获取钱包地址
         String address = credentials.getAddress();
 
@@ -135,10 +141,10 @@ public class EthChain {
             String encodedFunction = FunctionEncoder.encode(function);
 
             // 构建交易对象
-            Transaction transaction = Transaction.createFunctionCallTransaction(
+            org.web3j.protocol.core.methods.request.Transaction transaction = org.web3j.protocol.core.methods.request.Transaction.createFunctionCallTransaction(
                     fromAddress,
                     getTransactionNonce(fromAddress),
-                    Transaction.DEFAULT_GAS,
+                    org.web3j.protocol.core.methods.request.Transaction.DEFAULT_GAS,
                     null,
                     tokenAddress,
                     value,
@@ -161,6 +167,52 @@ public class EthChain {
         }
         System.out.println("tx hash " + txHash);
         return txHash;
+    }
+
+    /**
+     * 获取交易列表
+     *
+     * @param transactionListRequest 交易列表请求
+     * @return 交易列表
+     */
+    public PageInfo<Transaction> getTransactionList(UserTransactionListRequest transactionListRequest) {
+        int page = transactionListRequest.getPage();
+        int pageSize = transactionListRequest.getPageSize();
+
+        String fromAddress = transactionListRequest.getFromAddress();
+        String tokenAddress = transactionListRequest.getCoinType().getTokenAddress();
+        BigInteger startBlock = transactionListRequest.getStartBlock();
+        BigInteger endBlock = transactionListRequest.getEndBlock();
+
+        List<Transaction> allTransactions = new ArrayList<>();
+        try {
+            // 获取区块高度范围内的交易
+            for (BigInteger i = startBlock; i.compareTo(endBlock) <= 0; i = i.add(BigInteger.ONE)) {
+                EthBlock.Block block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(i), true).send().getBlock();
+                List<EthBlock.TransactionResult> blockTransactions = block.getTransactions();
+
+                for (EthBlock.TransactionResult txResult : blockTransactions) {
+                    if (txResult instanceof EthBlock.TransactionObject) {
+                        org.web3j.protocol.core.methods.response.Transaction tx = ((EthBlock.TransactionObject) txResult).get();
+
+                        if (fromAddress.equalsIgnoreCase(tx.getFrom()) || fromAddress.equalsIgnoreCase(tx.getTo())) {
+                            if (tokenAddress == null || tx.getTo().equalsIgnoreCase(tokenAddress)) {
+                                allTransactions.add(tx);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // 开始分页
+        Page<Transaction> pageInfo = PageHelper.startPage(page, pageSize);
+        // 将数据添加到 Page 对象
+        pageInfo.addAll(allTransactions);
+
+        return new PageInfo<>(pageInfo);
     }
 
     /**
