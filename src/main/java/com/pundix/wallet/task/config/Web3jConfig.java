@@ -9,7 +9,11 @@ import org.web3j.protocol.http.HttpService;
 @Configuration
 public class Web3jConfig {
 
-    private final String JSON_RPC_URL = "https://mainnet.infura.io/v3/d20d2f1b1f3b4eb7868f002272216072";
+    // 主网络
+//    private final String JSON_RPC_URL = "https://mainnet.infura.io/v3/d20d2f1b1f3b4eb7868f002272216072";
+
+    // 测试网络
+    private final String JSON_RPC_URL = "https://sepolia.infura.io/v3/d20d2f1b1f3b4eb7868f002272216072";
 
     @Bean
     public Web3j web3j() {

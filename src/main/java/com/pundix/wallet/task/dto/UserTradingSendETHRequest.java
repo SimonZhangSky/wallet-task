@@ -1,6 +1,5 @@
 package com.pundix.wallet.task.dto;
 
-import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 

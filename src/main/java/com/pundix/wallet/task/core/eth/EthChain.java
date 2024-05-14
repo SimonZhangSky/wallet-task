@@ -19,6 +19,7 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.*;
+import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
 
@@ -230,5 +231,26 @@ public class EthChain {
             e.printStackTrace();
         }
         return nonce;
+    }
+
+
+    public static void main(String[] args) throws IOException {
+        // 使用 Infura 的 Sepolia 测试网络 URL
+        String infuraProjectId = "d20d2f1b1f3b4eb7868f002272216072";
+        Web3j web3j = Web3j.build(new HttpService("https://sepolia.infura.io/v3/" + infuraProjectId));
+
+        // 要查询余额的以太坊地址
+        String address = "0x3717d4D1C97bBFd9a5E543E9aa880F4AD9c88270";
+
+        // 查询余额
+        EthGetBalance ethGetBalance = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send();
+        BigInteger balance = ethGetBalance.getBalance();
+
+        // 打印余额（以 wei 为单位）
+        System.out.println("Balance in wei: " + balance);
+
+        // 将余额转换为以太坊单位（ETH）
+        BigDecimal balanceInEther = new BigDecimal(balance).divide(new BigDecimal("1000000000000000000"));
+        System.out.println("Balance in Ether: " + balanceInEther);
     }
 }
