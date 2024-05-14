@@ -110,8 +110,8 @@ public class EthChain {
             txHash = transactionReceipt.getTransactionHash();
 
             log.info("ETH Transaction Response: {}", transactionReceipt);
-            log.info("ETH Transaction complete, view it at https://rinkeby.etherscan.io/tx/"
-                    + txHash);
+            log.info("ETH Transaction complete, view it at https://sepolia.etherscan.io/tx/" + txHash);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -161,8 +161,7 @@ public class EthChain {
 
             txHash = transactionResponse.getTransactionHash();
 
-            log.info("Token Transaction complete, view it at https://rinkeby.etherscan.io/tx/"
-                    + txHash);
+            log.info("Token Transaction complete, view it at https://sepolia.etherscan.io/tx/" + txHash);
         } catch (Exception e) {
             e.printStackTrace();
         }
