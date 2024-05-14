@@ -61,11 +61,13 @@ public class UserWalletService {
                 .collect(Collectors.toList());
     }
 
+    public BigInteger getUserBalance(int userId, String address) {
+        return ethChain.getBalanceByAddress(address);
+    }
+
     public UserWalletResponse createWallet(int userId) {
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) {
-            throw new EntityNotFoundException("User not found");
-        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         Triple<String, BigInteger, BigInteger> triple = ethChain.generateAddress();
 
