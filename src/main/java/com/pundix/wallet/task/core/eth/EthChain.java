@@ -1,5 +1,6 @@
 package com.pundix.wallet.task.core.eth;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
@@ -9,24 +10,28 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Triple;
 import org.springframework.stereotype.Component;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
-import org.web3j.crypto.Credentials;
-import org.web3j.crypto.ECKeyPair;
-import org.web3j.crypto.Keys;
+import org.web3j.contracts.token.ERC20Interface;
+import org.web3j.crypto.*;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.Contract;
 import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
+import org.web3j.utils.Numeric;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -41,6 +46,11 @@ public class EthChain {
     public EthChain(Web3j web3j) {
         this.web3j = web3j;
     }
+
+    // 默认的 Gas 费用
+    private static final BigInteger GAS_PRICE = org.web3j.protocol.core.methods.request.Transaction.DEFAULT_GAS;
+    // 交易的 Gas 限制
+    private static final BigInteger GAS_LIMIT = BigInteger.valueOf(100000);
 
     /**
      * 生成地址
@@ -132,32 +142,38 @@ public class EthChain {
         String fromAddress = userWallet.getAddress();
         BigInteger value = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger();
 
+        // 凭证
+        Credentials credentials = Credentials.create(userWallet.getPrivateKey());
+
         String txHash = null;
         try {
-            // 构造 ERC20 代币转账方法调用的函数对象
+            //创建RawTransaction交易对象
             Function function = new Function(
-                    "transfer", // 方法名
-                    List.of(new Address(toAddress), new Uint256(Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger())), // 方法参数
-                    List.of()); // 输出参数
+                    "transfer",
+                    Arrays.asList(new Address(toAddress), new Uint256(value)),
+                    List.of(new TypeReference<Type>() { })
+            );
             String encodedFunction = FunctionEncoder.encode(function);
 
             // 构建交易对象
-            org.web3j.protocol.core.methods.request.Transaction transaction = org.web3j.protocol.core.methods.request.Transaction.createFunctionCallTransaction(
-                    fromAddress,
+            RawTransaction rawTransaction = RawTransaction.createTransaction(
                     getTransactionNonce(fromAddress),
-                    org.web3j.protocol.core.methods.request.Transaction.DEFAULT_GAS,
-                    null,
+                    GAS_PRICE,
+                    GAS_LIMIT,
                     tokenAddress,
-                    value,
                     encodedFunction
             );
 
-            log.info("Token Transaction: {}", transaction);
+            log.info("Token Transaction: {}", JSON.toJSONString(rawTransaction));
 
-            // 发送交易并获取交易结果
-            EthSendTransaction transactionResponse = web3j.ethSendTransaction(transaction).sendAsync().get();
+            //签名Transaction，这里要对交易做签名
+            byte[] signMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
+            String hexValue = Numeric.toHexString(signMessage);
 
-            log.info("Token Transaction Response: {}", transactionResponse);
+            //发送交易
+            EthSendTransaction transactionResponse = web3j.ethSendRawTransaction(hexValue).sendAsync().get();
+
+            log.info("Token Transaction Response: {}", JSON.toJSONString(transactionResponse));
 
             txHash = transactionResponse.getTransactionHash();
 
