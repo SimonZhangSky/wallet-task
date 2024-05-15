@@ -24,8 +24,9 @@ public enum ETHCoinTypeEnum {
 
     // 测试网络地址
     Sepolia(null),
-    USDT("0xbf7521BD6abB6813491c32BfE407E1027A189A64"),
-    USDC("0x795dF1F5C992fc030F6ab55a18D0A00D8D4a7f29"),
+    USDT("0x271B34781c76fB06bfc54eD9cfE7c817d89f7759"),
+    USDC("0x6F6bB5dADDB05718382A0192B65603492C939f8F"),
+    AVAIL("0xa5a871723D0a70CddfF57f938F4C06Fc70632EEc")
     ;
 
     private final String tokenAddress;

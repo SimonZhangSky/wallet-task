@@ -47,6 +47,7 @@ public class UserWalletService {
                     BigInteger balance = ethChain.getBalanceByAddress(userWallet.getAddress());
                     BigDecimal balanceInEther = Convert.fromWei(balance.toString(), Convert.Unit.ETHER);
                     return new UserWalletResponse(
+                            userWallet.getId(),
                             userWallet.getWalletType(),
                             userWallet.getAddress(),
                             userWallet.getPrivateKey(),
@@ -77,6 +78,7 @@ public class UserWalletService {
         userWalletRepository.save(userWallet);
 
         return new UserWalletResponse(
+            userWallet.getId(),
             userWallet.getWalletType(),
             userWallet.getAddress(),
             userWallet.getPrivateKey(),

@@ -16,6 +16,8 @@ import java.math.BigInteger;
 @AllArgsConstructor
 public class UserWalletResponse {
 
+    private int walletId;
+
     @Enumerated(EnumType.STRING)
     private WalletTpyeEnum walletType;
 

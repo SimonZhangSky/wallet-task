@@ -47,7 +47,7 @@ public class UserWalletController {
     @PostMapping("/{userId}/create")
     @ApiOperation(value = "创建用户钱包地址")
     @ApiImplicitParam(name = "userId", value = "用户ID", required = true, dataType = "Integer", paramType = "path")
-    public ApiResponse createUser(@PathVariable Integer userId) {
+    public ApiResponse createUserWallet(@PathVariable Integer userId) {
         UserWalletResponse walletResponse = userWalletService.createWallet(userId);
 
         return ApiResponse.success("创建成功", walletResponse);

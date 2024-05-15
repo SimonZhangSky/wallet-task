@@ -15,15 +15,14 @@ import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
-import org.web3j.contracts.token.ERC20Interface;
 import org.web3j.crypto.*;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.http.HttpService;
-import org.web3j.tx.Contract;
 import org.web3j.tx.Transfer;
+import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
@@ -46,11 +45,6 @@ public class EthChain {
     public EthChain(Web3j web3j) {
         this.web3j = web3j;
     }
-
-    // 默认的 Gas 费用
-    private static final BigInteger GAS_PRICE = org.web3j.protocol.core.methods.request.Transaction.DEFAULT_GAS;
-    // 交易的 Gas 限制
-    private static final BigInteger GAS_LIMIT = BigInteger.valueOf(100000);
 
     /**
      * 生成地址
@@ -158,9 +152,10 @@ public class EthChain {
             // 构建交易对象
             RawTransaction rawTransaction = RawTransaction.createTransaction(
                     getTransactionNonce(fromAddress),
-                    GAS_PRICE,
-                    GAS_LIMIT,
+                    getTransactionGasPrice(),
+                    DefaultGasProvider.GAS_LIMIT,
                     tokenAddress,
+                    value,
                     encodedFunction
             );
 
@@ -183,6 +178,23 @@ public class EthChain {
         }
         System.out.println("tx hash " + txHash);
         return txHash;
+    }
+
+    /**
+     * 通过交易哈希获取交易详情
+     *
+     * @param txHash 交易哈希
+     * @return 交易详情
+     */
+    public String getTransactionByHash(String txHash) {
+        String tx = null;
+        try {
+            EthTransaction transaction = web3j.ethGetTransactionByHash(txHash).send();
+            tx = JSON.toJSONString(transaction);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return tx;
     }
 
     /**
@@ -248,6 +260,22 @@ public class EthChain {
         return nonce;
     }
 
+    /**
+     * 获取当前 Gas 价格
+     *
+     * @return Gas价格
+     */
+    private BigInteger getTransactionGasPrice() {
+        BigInteger gasPrice = BigInteger.ZERO;
+        try {
+            EthGasPrice ethGasPrice = web3j.ethGasPrice().send();
+            gasPrice = ethGasPrice.getGasPrice();
+            System.out.println("Current Gas Price: " + gasPrice.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return gasPrice;
+    }
 
     public static void main(String[] args) throws IOException {
         // 使用 Infura 的 Sepolia 测试网络 URL
@@ -267,5 +295,53 @@ public class EthChain {
         // 将余额转换为以太坊单位（ETH）
         BigDecimal balanceInEther = new BigDecimal(balance).divide(new BigDecimal("1000000000000000000"));
         System.out.println("Balance in Ether: " + balanceInEther);
+
+        // 获取交易次数
+//        String txHash = "0x20ae3404898aa5a3e09312d33602e75ca7c5284963fdcb472f654df41b5ffe31";
+//        EthTransaction transaction = web3j.ethGetTransactionByHash(txHash).send();
+//        System.out.println("EthTransaction is: " + transaction);
+//        System.out.println("EthTransaction Object is: " + transaction.getTransaction().get().toString());
+//        System.out.println("EthTransaction String is: " + JSON.toJSONString(transaction.getTransaction().get().getNonce()));
+//
+//        EthGasPrice ethGasPrice = web3j.ethGasPrice().send();
+//        BigInteger gasPrice = ethGasPrice.getGasPrice();
+//
+//        BigInteger value = Convert.toWei(String.valueOf(0), Convert.Unit.ETHER).toBigInteger();
+//
+//        //创建RawTransaction交易对象
+//        Function function = new Function(
+//                "transfer",
+//                Arrays.asList(new Address("0xEEefA9e1F1649c8F197281406636BC83000919B4"), new Uint256(value)),
+//                List.of(new TypeReference<Type>() { })
+//        );
+//        String encodedFunction = FunctionEncoder.encode(function);
+//
+//        // 构建取消交易对象
+//        RawTransaction rawTransaction = RawTransaction.createTransaction(
+//                transaction.getTransaction().get().getNonce(),
+//                gasPrice.multiply(BigInteger.valueOf(10)),
+//                DefaultGasProvider.GAS_LIMIT,
+//                "0xbf7521BD6abB6813491c32BfE407E1027A189A64",
+//                value,
+//                encodedFunction
+//        );
+//
+//        Credentials credentials = Credentials.create("168850a3e0eb88f1b083c04350472d4f0ddf6c69cc1a050912bc89f879820af7");
+//
+//        //签名Transaction，这里要对交易做签名
+//        byte[] signMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
+//        String hexValue = Numeric.toHexString(signMessage);
+//
+//        // 发送交易到网络
+//        web3j.ethSendRawTransaction(hexValue)
+//                .sendAsync()
+//                .thenAccept(transactionReceipt -> {
+//                    System.out.println("Transaction Hash: " + transactionReceipt.getTransactionHash());
+//                })
+//                .exceptionally(throwable -> {
+//                    System.err.println("Error: " + throwable.getMessage());
+//                    return null;
+//                });
+
     }
 }
