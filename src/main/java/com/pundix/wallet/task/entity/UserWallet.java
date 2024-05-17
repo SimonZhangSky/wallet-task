@@ -5,6 +5,8 @@ import com.pundix.wallet.task.enums.WalletTpyeEnum;
 import lombok.Data;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Date;
 
 @Entity
@@ -31,6 +33,18 @@ public class UserWallet {
 
     @Column(name = "public_key", nullable = false, length = 500, columnDefinition = "varchar(500) COMMENT '公钥'")
     private String publicKey;
+
+    @Column(name = "balance_wei", nullable = false, columnDefinition = "bigint COMMENT '余额Wei'")
+    private BigInteger balanceWei;
+
+    @Column(name = "balance_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '余额Ether'")
+    private BigDecimal balanceEther;
+
+    @Column(name = "gather_amount_wei", nullable = false, columnDefinition = "bigint COMMENT '归集金额Wei'")
+    private BigInteger gatherAmountWei;
+
+    @Column(name = "gather_amount_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '归集金额Ether'")
+    private BigDecimal gatherAmountEther;
 
     @Column(name = "create_time", nullable = false, columnDefinition = "datetime COMMENT '创建时间'")
     private Date createTime;

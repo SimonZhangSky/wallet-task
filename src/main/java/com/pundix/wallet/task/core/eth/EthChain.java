@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Triple;
 import org.springframework.stereotype.Component;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Function;
@@ -29,9 +30,7 @@ import org.web3j.utils.Numeric;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * 以太坊链操作
@@ -86,6 +85,44 @@ public class EthChain {
             throw new RuntimeException("获取ETH地址余额失败", e);
         }
         System.out.println("address " + address + " balance " + balance + "wei");
+        return balance;
+    }
+
+    /**
+     * 获取代币余额
+     *
+     * @param address      钱包地址
+     * @param tokenAddress 代币地址
+     * @return 代币余额
+     */
+    public BigInteger getTokenBalanceByAddress(String address, String tokenAddress) {
+        BigInteger balance = null;
+        try {
+            // 构建查询代币余额的方法
+            Function function = new Function(
+                    "balanceOf",
+                    Collections.singletonList(new Address(address)),
+                    Collections.singletonList(new TypeReference<Uint256>() {})
+            );
+            String encodedFunction = FunctionEncoder.encode(function);
+
+            // 发送查询请求
+            EthCall response = web3j.ethCall(
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(address, tokenAddress, encodedFunction),
+                    DefaultBlockParameterName.LATEST
+            ).sendAsync().get();
+
+            // 解析查询结果
+            List<Type> decodedResponse = FunctionReturnDecoder.decode(
+                    response.getValue(), function.getOutputParameters());
+            balance = (BigInteger) decodedResponse.get(0).getValue();
+
+            System.out.println("Balance: " + Convert.fromWei(balance.toString(), Convert.Unit.ETHER) + " Tokens");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("address " + address + "token address " + tokenAddress + " balance " + balance + "wei");
         return balance;
     }
 
@@ -198,6 +235,26 @@ public class EthChain {
     }
 
     /**
+     * 通过交易哈希获取交易结果信息
+     *
+     * @param txHash 交易哈希
+     * @return 交易结果信息
+     */
+    public TransactionReceipt getTransactionReceiptByHash(String txHash) {
+        TransactionReceipt tr = null;
+        try {
+            EthGetTransactionReceipt ethGetTransactionReceipt = web3j.ethGetTransactionReceipt(txHash).send();
+
+            if (ethGetTransactionReceipt.getTransactionReceipt().isPresent()) {
+                tr = ethGetTransactionReceipt.getTransactionReceipt().get();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return tr;
+    }
+
+    /**
      * 获取交易列表
      *
      * @param transactionListRequest 交易列表请求
@@ -221,7 +278,7 @@ public class EthChain {
 
                 for (EthBlock.TransactionResult txResult : blockTransactions) {
                     if (txResult instanceof EthBlock.TransactionObject) {
-                        org.web3j.protocol.core.methods.response.Transaction tx = ((EthBlock.TransactionObject) txResult).get();
+                        Transaction tx = ((EthBlock.TransactionObject) txResult).get();
 
                         if (fromAddress.equalsIgnoreCase(tx.getFrom()) || fromAddress.equalsIgnoreCase(tx.getTo())) {
                             if (tokenAddress == null || tx.getTo().equalsIgnoreCase(tokenAddress)) {

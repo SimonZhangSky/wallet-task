@@ -43,10 +43,7 @@ public class UserWalletService {
         List<UserWallet> userWallets = userWalletRepository.findByUserId(user.getId());
 
         return userWallets.stream()
-                .map(userWallet -> {
-                    BigInteger balance = ethChain.getBalanceByAddress(userWallet.getAddress());
-                    BigDecimal balanceInEther = Convert.fromWei(balance.toString(), Convert.Unit.ETHER);
-                    return new UserWalletResponse(
+                .map(userWallet -> new UserWalletResponse(
                             userWallet.getId(),
                             userWallet.getWalletType(),
                             userWallet.getAddress(),
@@ -55,10 +52,10 @@ public class UserWalletService {
                             userWallet.getStatus(),
                             userWallet.getRemark(),
                             userWallet.isDefault(),
-                            balance,
-                            balanceInEther
-                    );
-                })
+                            userWallet.getBalanceWei(),
+                            userWallet.getBalanceEther()
+                    )
+                )
                 .collect(Collectors.toList());
     }
 
@@ -102,6 +99,10 @@ public class UserWalletService {
         userWallet.setAddress(address);
         userWallet.setPrivateKey(privateKey);
         userWallet.setPublicKey(publicKey);
+        userWallet.setBalanceWei(BigInteger.ZERO);
+        userWallet.setBalanceEther(Convert.fromWei("0", Convert.Unit.ETHER));
+        userWallet.setGatherAmountWei(BigInteger.ZERO);
+        userWallet.setGatherAmountEther(Convert.fromWei("0", Convert.Unit.ETHER));
         userWallet.setStatus(WalletStatusEnum.NORMAL);
         userWallet.setDefault(false);
         userWallet.setCreateTime(new Date());
