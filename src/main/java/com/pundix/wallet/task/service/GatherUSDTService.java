@@ -74,8 +74,17 @@ public class GatherUSDTService {
                 BigDecimal gasAmountEther = new BigDecimal("0.1");
                 String txHash = ethChain.sendETHTransaction(gatherWallet, userWallet.getAddress(), gasAmountEther);
 
+//                // 获取Gas费用和Gas limit
+//                BigInteger nonce = ethChain.getTransactionNonce(gatherWallet.getAddress());
+//                BigInteger gasPrice = ethChain.getTransactionGasPrice();
+//                BigInteger gasLimit = ethChain.getTokenEstimateGas(gatherWallet.getAddress(), userWallet.getAddress(), gasAmountEther, USDT_TOKEN_ADDRESS);
+//                // 获取估算的Gas总费用
+//                gasAmountEther = Convert.fromWei(gasPrice.multiply(gasLimit).toString(), Convert.Unit.ETHER);
+//                // 发送估算的Gas总费用交易
+//                String txHash = ethChain.sendETHTransaction(gatherWallet.getAddress(), userWallet.getAddress(), gasAmountEther, gasPrice, gasLimit, nonce);
+
                 // 保存发送Gas记录
-                saveGatherGasRecord(userWallet, txHash, balanceInEther);
+                saveGatherGasRecord(userWallet, txHash, gasAmountEther);
             }
         });
     }
