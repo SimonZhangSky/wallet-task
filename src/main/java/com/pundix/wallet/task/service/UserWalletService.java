@@ -101,8 +101,10 @@ public class UserWalletService {
         userWallet.setPublicKey(publicKey);
         userWallet.setBalanceWei(BigInteger.ZERO);
         userWallet.setBalanceEther(Convert.fromWei("0", Convert.Unit.ETHER));
-        userWallet.setGatherAmountWei(BigInteger.ZERO);
-        userWallet.setGatherAmountEther(Convert.fromWei("0", Convert.Unit.ETHER));
+        userWallet.setGatherETHAmountWei(BigInteger.ZERO);
+        userWallet.setGatherETHAmountEther(Convert.fromWei("0", Convert.Unit.ETHER));
+        userWallet.setGatherUSDTAmountWei(BigInteger.ZERO);
+        userWallet.setGatherUSDTAmountEther(Convert.fromWei("0", Convert.Unit.ETHER));
         userWallet.setStatus(WalletStatusEnum.NORMAL);
         userWallet.setDefault(false);
         userWallet.setCreateTime(new Date());

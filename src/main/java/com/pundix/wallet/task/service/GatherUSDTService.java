@@ -70,11 +70,9 @@ public class GatherUSDTService {
 
             // 如果余额大于10
             if (balanceInEther.compareTo(new BigDecimal("10")) > 0) {
-                // 发送0.1到归集地址
+                // 向用户钱包发送0.1ETH，作为Gas费用
                 BigDecimal gasAmountEther = new BigDecimal("0.1");
-
-                // 向用户钱包发送0.1USDT，作为Gas费用
-                String txHash = ethChain.sendTokenTransaction(gatherWallet, userWallet.getAddress(), gasAmountEther, USDT_TOKEN_ADDRESS);
+                String txHash = ethChain.sendETHTransaction(gatherWallet, userWallet.getAddress(), gasAmountEther);
 
                 // 保存发送Gas记录
                 saveGatherGasRecord(userWallet, txHash, balanceInEther);
@@ -118,11 +116,8 @@ public class GatherUSDTService {
 
                         // 用户USDT余额大于10
                         if (balanceInEther.compareTo(new BigDecimal("10")) > 0) {
-                            // 将用户的USDT余额减去发送的Gas费用
-                            BigDecimal gatherAmountEther = balanceInEther.subtract(gatherGasRecord.getGasAmountEther());
-
                             // 向归集地址发送用户的USDT余额
-                            String txHash = ethChain.sendTokenTransaction(userWallet, gatherAddress, gatherAmountEther, USDT_TOKEN_ADDRESS);
+                            String txHash = ethChain.sendTokenTransaction(userWallet, gatherAddress, balanceInEther, USDT_TOKEN_ADDRESS);
 
                             // 保存发送USDT记录
                             saveGatherUSDTRecord(userWallet, txHash, balance, balanceInEther);
@@ -167,11 +162,11 @@ public class GatherUSDTService {
                         gatherUSDTRecord.setUpdateTime(new Date());
                         gatherUSDTRecordRepository.save(gatherUSDTRecord);
 
-                        // 更新用户钱包余额
+                        // 更新用户钱包归集USDT金额
                         userWalletRepository.findById(gatherUSDTRecord.getUserWalletId())
                                 .ifPresent(userWallet -> {
-                                    userWallet.setGatherAmountWei(userWallet.getGatherAmountWei().add(gatherUSDTRecord.getGatherAmountWei()));
-                                    userWallet.setGatherAmountEther(userWallet.getGatherAmountEther().add(gatherUSDTRecord.getGatherAmountEther()));
+                                    userWallet.setGatherUSDTAmountWei(userWallet.getGatherUSDTAmountWei().add(gatherUSDTRecord.getGatherAmountWei()));
+                                    userWallet.setGatherUSDTAmountEther(userWallet.getGatherUSDTAmountEther().add(gatherUSDTRecord.getGatherAmountEther()));
                                     userWallet.setUpdateTime(new Date());
                                     userWalletRepository.save(userWallet);
                                 });

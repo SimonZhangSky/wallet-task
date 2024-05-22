@@ -32,7 +32,7 @@ public class GatherController {
     }
 
     @GetMapping("/usdt/start")
-    @ApiOperation("手动开启归集ETH")
+    @ApiOperation("手动开启归集USDT")
     public ApiResponse usdtStart() {
         gatherUSDTService.gatherUSDT();
 

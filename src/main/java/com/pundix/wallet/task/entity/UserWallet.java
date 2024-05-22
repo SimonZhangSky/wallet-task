@@ -40,11 +40,17 @@ public class UserWallet {
     @Column(name = "balance_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '余额Ether'")
     private BigDecimal balanceEther;
 
-    @Column(name = "gather_amount_wei", nullable = false, columnDefinition = "bigint COMMENT '归集金额Wei'")
-    private BigInteger gatherAmountWei;
+    @Column(name = "gather_eth_amount_wei", nullable = false, columnDefinition = "bigint COMMENT '归集ETH金额Wei'")
+    private BigInteger gatherETHAmountWei;
 
-    @Column(name = "gather_amount_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '归集金额Ether'")
-    private BigDecimal gatherAmountEther;
+    @Column(name = "gather_eth_amount_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '归集ETH金额Ether'")
+    private BigDecimal gatherETHAmountEther;
+
+    @Column(name = "gather_usdt_amount_wei", nullable = false, columnDefinition = "bigint COMMENT '归集Token金额Wei'")
+    private BigInteger gatherUSDTAmountWei;
+
+    @Column(name = "gather_usdt_amount_ether", nullable = false, columnDefinition = "decimal(20, 10) COMMENT '归集Token金额Ether'")
+    private BigDecimal gatherUSDTAmountEther;
 
     @Column(name = "create_time", nullable = false, columnDefinition = "datetime COMMENT '创建时间'")
     private Date createTime;

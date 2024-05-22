@@ -59,16 +59,35 @@ public class GatherETHService {
             BigInteger balance = ethChain.getBalanceByAddress(userWallet.getAddress());
             BigDecimal balanceInEther = Convert.fromWei(balance.toString(), Convert.Unit.ETHER);
 
-            // 如果余额大于0.1ETH
-            if (balanceInEther.compareTo(new BigDecimal("0.1")) > 0) {
-                // 留0.1ETH来支付Gas费用
-                BigDecimal gatherAmountEther = balanceInEther.subtract(new BigDecimal("0.1"));
+            BigInteger nonce = ethChain.getTransactionNonce(userWallet.getAddress());
+            // 获取Gas   大于Gas费用的就归集
+            BigInteger gasPrice = ethChain.getTransactionGasPrice();
+            // 获取估算Gas Limit
+            BigInteger gasLimit = ethChain.getETHEstimateGas(userWallet.getAddress(), gatherAddress, balanceInEther, nonce, gasPrice);
+            // 计算Gas总费用
+            BigInteger totalGasCost = gasPrice.multiply(gasLimit);
 
-                // 则将ETH归集到指定地址
-                String txHash = ethChain.sendETHTransaction(userWallet, gatherAddress, gatherAmountEther);
+            // 如果余额大于Gas总费用
+            if (balance.compareTo(totalGasCost) > 0) {
+                // 计算实际归集金额
+                BigInteger amountToGather = balance.subtract(totalGasCost);
+                BigDecimal amountToGatherInEther = Convert.fromWei(amountToGather.toString(), Convert.Unit.ETHER);
 
-                // 保存归集交易记录
-                saveGatherETHRecord(userWallet, txHash, balance, balanceInEther, gatherAmountEther);
+                // 再次估算Gas费用(因实际归集金额不同，Gas费用不同)
+                gasLimit = ethChain.getETHEstimateGas(userWallet.getAddress(), gatherAddress, amountToGatherInEther, nonce, gasPrice);
+                totalGasCost = gasPrice.multiply(gasLimit);
+                // 最终实际归集金额
+                amountToGather = balance.subtract(totalGasCost);
+
+                if (amountToGather.compareTo(BigInteger.ZERO) > 0) {
+                    amountToGatherInEther = Convert.fromWei(amountToGather.toString(), Convert.Unit.ETHER);
+
+                    // 则将ETH归集到指定地址
+                    String txHash = ethChain.sendETHTransaction(userWallet.getAddress(), gatherAddress, amountToGatherInEther, gasPrice, gasLimit, nonce);
+
+                    // 保存归集交易记录
+                    saveGatherETHRecord(userWallet, txHash, balance, balanceInEther, amountToGatherInEther);
+                }
             }
         });
     }
@@ -84,7 +103,7 @@ public class GatherETHService {
         // 获取所有Pending的交易
         List<GatherETHRecord> pendingRecords = gatherETHRecordRepository.findPendingRecords();
         if (pendingRecords == null || pendingRecords.isEmpty()) {
-            log.info("没有待处理的交易");
+            log.info("没有待处理的归集ETH交易");
             return;
         }
         // 遍历检查所有交易的状态
@@ -98,11 +117,11 @@ public class GatherETHService {
                     gatherETHRecord.setUpdateTime(new Date());
                     gatherETHRecordRepository.save(gatherETHRecord);
 
-                    // 更新用户钱包余额
+                    // 更新用户钱包归集ETH金额
                     userWalletRepository.findById(gatherETHRecord.getUserWalletId())
                         .ifPresent(userWallet -> {
-                            userWallet.setGatherAmountWei(userWallet.getGatherAmountWei().add(gatherETHRecord.getGatherAmountWei()));
-                            userWallet.setGatherAmountEther(userWallet.getGatherAmountEther().add(gatherETHRecord.getGatherAmountEther()));
+                            userWallet.setGatherETHAmountWei(userWallet.getGatherETHAmountWei().add(gatherETHRecord.getGatherAmountWei()));
+                            userWallet.setGatherETHAmountEther(userWallet.getGatherETHAmountEther().add(gatherETHRecord.getGatherAmountEther()));
                             userWallet.setUpdateTime(new Date());
                             userWalletRepository.save(userWallet);
                         });
@@ -110,9 +129,11 @@ public class GatherETHService {
                     log.info("Transaction Successful, ETH record id: {}", gatherETHRecord.getId());
                 } else {
                     // 更新交易状态
-                    gatherETHRecord.setStatus(TransactionStatusEnum.SUCCESS);
+                    gatherETHRecord.setStatus(TransactionStatusEnum.FAIL);
                     gatherETHRecord.setUpdateTime(new Date());
                     gatherETHRecordRepository.save(gatherETHRecord);
+
+                    // 重试  告警
 
                     log.error("Transaction Failed, ETH record id: {}", gatherETHRecord.getId());
                 }

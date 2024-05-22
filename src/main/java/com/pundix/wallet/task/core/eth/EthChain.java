@@ -22,6 +22,7 @@ import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.ChainIdLong;
 import org.web3j.tx.Transfer;
 import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.utils.Convert;
@@ -30,7 +31,10 @@ import org.web3j.utils.Numeric;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 以太坊链操作
@@ -127,7 +131,86 @@ public class EthChain {
     }
 
     /**
-     * 发送ETH交易
+     * 获取ETH估算Gas
+     *
+     * @param fromAddress 付款方
+     * @param toAddress   收款方
+     * @param amount      金额
+     * @param nonce       交易次数
+     * @param gasPrice    Gas 价格
+     * @return 估算Gas
+     */
+    public BigInteger getETHEstimateGas(String fromAddress, String toAddress, BigDecimal amount, BigInteger nonce, BigInteger gasPrice) {
+        BigInteger estimateGasLimit = BigInteger.ZERO;
+        try {
+            BigInteger value = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger();
+            // 创建交易对象
+            org.web3j.protocol.core.methods.request.Transaction transaction = org.web3j.protocol.core.methods.request.Transaction.createEtherTransaction(
+                    fromAddress,
+                    nonce,
+                    gasPrice,
+                    BigInteger.ZERO,
+                    toAddress,
+                    value
+            );
+
+            // 估算Gas Limit
+            EthEstimateGas ethEstimateGas = web3j.ethEstimateGas(transaction).send();
+            estimateGasLimit = ethEstimateGas.getAmountUsed();
+            log.info("Estimated Gas limit: " + estimateGasLimit);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return estimateGasLimit;
+    }
+
+    /**
+     * 发送ETH交易(指定Gas)
+     *
+     * @param fromAddress 付款方
+     * @param toAddress   收款方
+     * @param amount      金额
+     * @param gasPrice    Gas 价格
+     * @param gasLimit    Gas 限制
+     * @param nonce       交易次数
+     * @return 交易 Hash
+     */
+    public String sendETHTransaction(String fromAddress, String toAddress, BigDecimal amount, BigInteger gasPrice, BigInteger gasLimit, BigInteger nonce) {
+        String txHash = null;
+        try {
+            BigInteger value = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger();
+            // 获取凭证
+            Credentials credentials = Credentials.create(fromAddress);
+
+            // 创建交易对象
+            RawTransaction rawTransaction = RawTransaction.createEtherTransaction(
+                    nonce,
+                    gasPrice,
+                    gasLimit,
+                    toAddress,
+                    value
+            );
+
+            // 对交易签名
+            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, ChainIdLong.MAINNET, credentials);
+            String hexValue = Numeric.toHexString(signedMessage);
+
+            // 发送交易并广播
+            EthSendTransaction ethSendTransaction = web3j.ethSendRawTransaction(hexValue).send();
+
+            txHash = ethSendTransaction.getTransactionHash();
+
+            log.info("ETH Transaction Response: {}", ethSendTransaction);
+            log.info("ETH Transaction complete, view it at https://sepolia.etherscan.io/tx/" + txHash);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return txHash;
+    }
+
+    /**
+     * 直接发送ETH交易（不关心Gas）
      *
      * @param userWallet  钱包
      * @param toAddress   收款方
@@ -152,11 +235,44 @@ public class EthChain {
 
             log.info("ETH Transaction Response: {}", transactionReceipt);
             log.info("ETH Transaction complete, view it at https://sepolia.etherscan.io/tx/" + txHash);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
         return txHash;
+    }
+
+    /**
+     * 获取Token估算Gas
+     *
+     * @param fromAddress 付款方
+     * @param toAddress   收款方
+     * @param amount      金额
+     * @param tokenAddress 代币地址
+     * @return 估算Gas
+     */
+    public BigInteger getTokenEstimateGas(String fromAddress, String toAddress, BigDecimal amount, String tokenAddress) {
+        BigInteger estimateGasLimit = BigInteger.ZERO;
+        try {
+            BigInteger value = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger();
+
+            // 创建transfer方法
+            String encodedFunction = createTransferFunction(toAddress, value);
+
+            // 创建交易对象
+            org.web3j.protocol.core.methods.request.Transaction transaction = org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
+                    fromAddress,
+                    tokenAddress,
+                    encodedFunction
+            );
+            EthEstimateGas ethEstimateGas = web3j.ethEstimateGas(transaction).send();
+
+            // 估算Gas Limit
+            estimateGasLimit = ethEstimateGas.getAmountUsed();
+            log.info("Estimated Gas limit: " + estimateGasLimit);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return estimateGasLimit;
     }
 
     /**
@@ -178,13 +294,8 @@ public class EthChain {
 
         String txHash = null;
         try {
-            //创建RawTransaction交易对象
-            Function function = new Function(
-                    "transfer",
-                    Arrays.asList(new Address(toAddress), new Uint256(value)),
-                    List.of(new TypeReference<Type>() { })
-            );
-            String encodedFunction = FunctionEncoder.encode(function);
+            // 构建transfer方法
+            String encodedFunction = createTransferFunction(toAddress, value);
 
             // 构建交易对象
             RawTransaction rawTransaction = RawTransaction.createTransaction(
@@ -192,7 +303,6 @@ public class EthChain {
                     getTransactionGasPrice(),
                     DefaultGasProvider.GAS_LIMIT,
                     tokenAddress,
-                    value,
                     encodedFunction
             );
 
@@ -215,6 +325,22 @@ public class EthChain {
         }
         System.out.println("tx hash " + txHash);
         return txHash;
+    }
+
+    /**
+     * 创建转账方法
+     *
+     * @param toAddress 收款地址
+     * @param value     金额
+     * @return 转账方法
+     */
+    private String createTransferFunction(String toAddress, BigInteger value) {
+        Function function = new Function(
+                "transfer",
+                Arrays.asList(new Address(toAddress), new Uint256(value)),
+                List.of(new TypeReference<Type>() { })
+        );
+        return FunctionEncoder.encode(function);
     }
 
     /**
@@ -300,13 +426,15 @@ public class EthChain {
         return new PageInfo<>(pageInfo);
     }
 
+    // TODO 监听链上所有地址的交易 并保存到数据库
+
     /**
      * 获取账号交易次数 nonce
      *
      * @param address 钱包地址
      * @return nonce
      */
-    private BigInteger getTransactionNonce(String address) {
+    public BigInteger getTransactionNonce(String address) {
         BigInteger nonce = BigInteger.ZERO;
         try {
             EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(address, DefaultBlockParameterName.PENDING).send();
@@ -322,7 +450,7 @@ public class EthChain {
      *
      * @return Gas价格
      */
-    private BigInteger getTransactionGasPrice() {
+    public BigInteger getTransactionGasPrice() {
         BigInteger gasPrice = BigInteger.ZERO;
         try {
             EthGasPrice ethGasPrice = web3j.ethGasPrice().send();
