@@ -1,13 +1,16 @@
 package com.pundix.wallet.task.core.eth;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.pundix.wallet.task.dto.UserTransactionListRequest;
+import com.pundix.wallet.task.dto.event.TransactionRecordEvent;
 import com.pundix.wallet.task.entity.UserWallet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Triple;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
@@ -35,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 以太坊链操作
@@ -45,8 +49,11 @@ public class EthChain {
 
     private final Web3j web3j;
 
-    public EthChain(Web3j web3j) {
+    private final ApplicationEventPublisher eventPublisher;
+
+    public EthChain(Web3j web3j, ApplicationEventPublisher eventPublisher) {
         this.web3j = web3j;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -426,8 +433,6 @@ public class EthChain {
         return new PageInfo<>(pageInfo);
     }
 
-    // TODO 监听链上所有地址的交易 并保存到数据库
-
     /**
      * 获取账号交易次数 nonce
      *
@@ -460,6 +465,122 @@ public class EthChain {
             e.printStackTrace();
         }
         return gasPrice;
+    }
+
+    /**
+     * 监听交易
+     *
+     * @param addresses 需要监听的地址
+     */
+    public void listenTransactions(List<String> addresses) {
+        log.info("开始监听链上交易");
+        web3j.transactionFlowable().subscribe(tx -> {
+            // 异步处理交易记录事件
+            CompletableFuture.runAsync(() -> {
+                asyncHandleTransactionRecordEvent(addresses, tx);
+            });
+        }, Throwable::printStackTrace);
+    }
+
+    private void asyncHandleTransactionRecordEvent(List<String> addresses, Transaction transaction) {
+        // 判断是否是需要监听的地址(只处理我们地址相关的交易)
+        if (addresses.contains(transaction.getFrom()) || addresses.contains(transaction.getTo())) {
+            // 发送内部事件（解耦，避免与Service服务互相调用）
+            TransactionRecordEvent transactionRecordEvent = new TransactionRecordEvent(this, transaction);
+            eventPublisher.publishEvent(transactionRecordEvent);
+
+            log.info("交易地址符合，发送交易事件: {}", transactionRecordEvent);
+        }
+    }
+
+    /**
+     * 监听Block交易
+     *
+     * @param addresses 需要监听的地址
+     */
+    public void listenBlocks(List<String> addresses) {
+        log.info("开始监听Block交易");
+        // 监听链上新Block上所有交易
+        web3j.blockFlowable(false).subscribe(block -> {
+            EthBlock.Block currentBlock = block.getBlock();
+            log.info("当前Block: {}", currentBlock.getNumber().toString());
+            List<EthBlock.TransactionResult> transactions = currentBlock.getTransactions();
+            transactions.forEach(txResult -> {
+                // 异步处理交易记录事件
+                CompletableFuture.runAsync(() -> {
+                    asyncHandleBlockTransactionRecordEvent(addresses, txResult);
+                });
+            });
+        }, Throwable::printStackTrace);
+    }
+
+    private void asyncHandleBlockTransactionRecordEvent(List<String> addresses, EthBlock.TransactionResult txResult) {
+        Transaction transaction = null;
+        if (txResult instanceof EthBlock.TransactionObject) {
+            EthBlock.TransactionObject transactionObject = (EthBlock.TransactionObject) txResult;
+            transaction = transactionObject.get();
+        } else if (txResult instanceof EthBlock.TransactionHash) {
+            String transactionHash = (String) txResult.get();
+            try {
+                EthTransaction ethTransaction = web3j.ethGetTransactionByHash(transactionHash).send();
+                transaction = ethTransaction.getTransaction().orElse(null);
+            } catch (Exception e) {
+                return;
+            }
+        } else {
+            log.info("当前交易不是标准交易: {}", txResult);
+        }
+
+        if (transaction != null) {
+            // 判断是否是需要监听的地址(只处理我们地址相关的交易)
+            if (addresses.contains(transaction.getFrom()) || addresses.contains(transaction.getTo())) {
+                // 发送内部事件（解耦，避免与Service服务互相调用）
+                TransactionRecordEvent transactionRecordEvent = new TransactionRecordEvent(this, transaction);
+                eventPublisher.publishEvent(transactionRecordEvent);
+
+                log.info("交易地址符合，发送交易事件: {}", transactionRecordEvent);
+            }
+        }
+    }
+
+    /**
+     * 解析输入参数
+     *
+     * @param input 输入参数
+     * @return 解析后的参数
+     */
+    public String serializeInput(String input) {
+        JSONObject jsonObject = new JSONObject();
+        Function transferFunction = new Function(
+                "transfer",
+                Arrays.asList(new Address("0x0"), new Uint256(0)),  // 参数列表
+                Arrays.asList()  // 输出参数列表
+        );
+
+        if (input.startsWith(FunctionEncoder.encode(transferFunction).substring(0, 10))) {
+            // 去掉方法签名的前缀
+            String encodedParams = input.substring(10);
+            List<TypeReference<Type>> parameterTypes = new ArrayList<>();
+            for (Type type : transferFunction.getInputParameters()) {
+                // 获取 Type 的类对象
+                Class<? extends Type> typeClass = type.getClass();
+                // 使用 TypeReference 的构造函数创建 TypeReference 对象
+                TypeReference<Type> typeReference = (TypeReference<Type>) TypeReference.create(typeClass);
+                parameterTypes.add(typeReference);
+            }
+            List<Type> parameters = FunctionReturnDecoder.decode(encodedParams, parameterTypes);
+
+            String to = (String) parameters.get(0).getValue();
+            BigInteger value = ((Uint256) parameters.get(1)).getValue();
+
+            System.out.println("Transfer method=transfer, to=" + to + ", value=" + value);
+
+            jsonObject.put("functionName", "transfer");
+            jsonObject.put("to", to);
+            jsonObject.put("value", value);
+            return jsonObject.toJSONString();
+        }
+        return null;
     }
 
     public static void main(String[] args) throws IOException {
@@ -527,6 +648,36 @@ public class EthChain {
 //                    System.err.println("Error: " + throwable.getMessage());
 //                    return null;
 //                });
+
+//        String input = "0xa9059cbb000000000000000000000000eeefa9e1f1649c8f197281406636bc83000919b40000000000000000000000000000000000000000000000000e043da617250000";
+//        Function transferFunction = new Function(
+//                "transfer",
+//                Arrays.asList(new Address("0x0"), new Uint256(0)),  // 参数列表
+//                Arrays.asList()  // 输出参数列表
+//        );
+//
+//        String encode = FunctionEncoder.encode(transferFunction);
+//
+//        System.out.println("Transfer method: to=" + encode);
+//
+//        if (input.startsWith(encode.substring(0, 10))) {
+//            String encodedParams = input.substring(10); // 去掉方法签名的前缀
+//
+//            List<TypeReference<Type>> typeReferences = new ArrayList<>();
+//            for (Type type : transferFunction.getInputParameters()) {
+//                // 获取 Type 的类对象
+//                Class<? extends Type> typeClass = type.getClass();
+//                // 使用 TypeReference 的构造函数创建 TypeReference 对象
+//                TypeReference<Type> typeReference = (TypeReference<Type>) TypeReference.create(typeClass);
+//                typeReferences.add(typeReference);
+//            }
+//            List<Type> parameters = FunctionReturnDecoder.decode(encodedParams, typeReferences);
+//
+//            String to = (String) parameters.get(0).getValue();
+//            BigInteger value = ((Uint256) parameters.get(1)).getValue();
+//
+//            System.out.println("Transfer method: to=" + to + ", value=" + value);
+//        }
 
     }
 }

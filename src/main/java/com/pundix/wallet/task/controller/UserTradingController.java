@@ -4,9 +4,15 @@ import com.github.pagehelper.PageInfo;
 import com.pundix.wallet.task.dto.UserTradingSendETHRequest;
 import com.pundix.wallet.task.dto.UserTradingSendTokenRequest;
 import com.pundix.wallet.task.dto.UserTransactionListRequest;
+import com.pundix.wallet.task.entity.TransactionRecord;
+import com.pundix.wallet.task.service.TransactionRecordService;
 import com.pundix.wallet.task.service.UserTradingService;
 import com.pundix.wallet.task.utils.ApiResponse;
-import io.swagger.annotations.*;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiImplicitParams;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.web3j.protocol.core.methods.response.Transaction;
 
@@ -17,8 +23,11 @@ public class UserTradingController {
 
     private final UserTradingService userTradingService;
 
-    public UserTradingController(UserTradingService userTradingService) {
+    private final TransactionRecordService transactionRecordService;
+
+    public UserTradingController(UserTradingService userTradingService, TransactionRecordService transactionRecordService) {
         this.userTradingService = userTradingService;
+        this.transactionRecordService = transactionRecordService;
     }
 
     @PostMapping("/{userId}/sendETH")
@@ -47,6 +56,18 @@ public class UserTradingController {
         return ApiResponse.success("交易成功", txHash);
     }
 
+    @PostMapping("/{userId}/transaction/chain/list")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "userId", value = "用户ID", required = true, dataType = "Integer", paramType = "path"),
+            @ApiImplicitParam(name = "transactionListRequest", value = "用户查询交易请求", required = true, dataType = "UserTransactionListRequest", paramType = "body")
+    })
+    public ApiResponse transactionChainList(@PathVariable Integer userId, @RequestBody UserTransactionListRequest transactionListRequest) {
+
+        PageInfo<Transaction> transactionPageInfo = userTradingService.transactionList(userId, transactionListRequest);
+
+        return ApiResponse.success("查询成功", transactionPageInfo);
+    }
+
     @PostMapping("/{userId}/transaction/list")
     @ApiImplicitParams({
             @ApiImplicitParam(name = "userId", value = "用户ID", required = true, dataType = "Integer", paramType = "path"),
@@ -54,9 +75,8 @@ public class UserTradingController {
     })
     public ApiResponse transactionList(@PathVariable Integer userId, @RequestBody UserTransactionListRequest transactionListRequest) {
 
-        PageInfo<Transaction> transactionPageInfo = userTradingService.transactionList(userId, transactionListRequest);
+        Page<TransactionRecord> transactionPage = transactionRecordService.transactionList(userId, transactionListRequest);
 
-        return ApiResponse.success("查询成功", transactionPageInfo);
+        return ApiResponse.success("查询成功", transactionPage);
     }
-
 }

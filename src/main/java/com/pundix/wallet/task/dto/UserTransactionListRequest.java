@@ -23,7 +23,7 @@ public class UserTransactionListRequest extends BasePageRequest {
     private BigInteger endBlock;
 
     @Enumerated(EnumType.STRING)
-    @ApiModelProperty(value = "币种", required = true, example = "USDT")
+    @ApiModelProperty(value = "币种", example = "USDT")
     private ETHCoinTypeEnum coinType;
 
 }
